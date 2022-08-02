@@ -42,7 +42,5 @@ class SequenceAlignment:
 @functools.lru_cache(maxsize=MAX_CACHED_RESULTS)
 def f_similarity(a, b):
     # the two elements match
-    if a == b:
-        return 1.0
-    return 0.0
+    return 1.0 if a == b else 0.0
 

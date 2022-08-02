@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import struct
@@ -16,7 +17,7 @@ from cryptography.hazmat.primitives.ciphers.algorithms import AES
 from cryptography.hazmat.primitives.hashes import SHA256
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 from pmercury.protocols.tls import TLS
 
@@ -46,12 +47,12 @@ class IQUIC(Protocol):
 
     @staticmethod
     def proto_identify(data, offset, data_len):
-        if (data[offset+1] != 0xff or
-            data[offset+2] != 0x00 or
-            data[offset+3] != 0x00 or
-            data[offset+4] not in VERSIONS):
-            return False
-        return True
+        return (
+            data[offset + 1] == 0xFF
+            and data[offset + 2] == 0x00
+            and data[offset + 3] == 0x00
+            and data[offset + 4] in VERSIONS
+        )
 
 
     @staticmethod
@@ -145,7 +146,7 @@ class IQUIC(Protocol):
     def fingerprint(data, offset, data_len):
         encrypted_data = data[offset:]
         decrypted_data = IQUIC.decrypt_packet(encrypted_data)
-        if decrypted_data == None:
+        if decrypted_data is None:
             return None, None
         if (decrypted_data[0] != 0x01 or
             decrypted_data[4] != 0x03 or
@@ -153,12 +154,12 @@ class IQUIC(Protocol):
             return None, None
 
         fp_, context = TLS.fingerprint(bytes.fromhex('1603030000') + decrypted_data, 0, len(decrypted_data)+5)
-        if fp_ == None:
+        if fp_ is None:
             return None, None
 
         quic_version = encrypted_data[1:5].hex()
 
-        return '('+quic_version+')'+fp_, context
+        return f'({quic_version}){fp_}', context
 
 
     def get_human_readable(self, fp_str_):

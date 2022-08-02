@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import socket
@@ -13,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, dsa, ec
 
 # TLS helper classes
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 from pmercury.utils.tls_utils import *
 from pmercury.utils.tls_constants import *
@@ -43,23 +44,23 @@ class TLS_Certificate_Full(Protocol):
 
 
     def proto_identify(self, data, offset):
-        if (data[offset]   == 22 and
-            data[offset+1] ==  3 and
-            data[offset+2] <=  3 and
-            data[offset+5] == 11):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 11
+        )
 
 
     def proto_identify_sh(self, data, offset):
-        if (data[offset]    == 22 and
-            data[offset+1]  ==  3 and
-            data[offset+2]  <=  3 and
-            data[offset+5]  ==  2 and
-            data[offset+9]  ==  3 and
-            data[offset+10] <=  3):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 2
+            and data[offset + 9] == 3
+            and data[offset + 10] <= 3
+        )
 
 
     def fingerprint(self, data, ip_offset, tcp_offset, app_offset, ip_type, ip_length, data_len):
@@ -94,9 +95,9 @@ class TLS_Certificate_Full(Protocol):
             return protocol_type, fp_str_, None
 
         certs = data[7:]
-        cert_len = int(hexlify(certs[0:3]),16)
+        cert_len = int(hexlify(certs[:3]), 16)
 
-        cert_data = certs[3:3+int(hexlify(certs[0:3]),16)]
+        cert_data = certs[3:3 + int(hexlify(certs[:3]), 16)]
 
         try:
             cert = x509.load_der_x509_certificate(cert_data, default_backend())
@@ -178,10 +179,12 @@ class TLS_Certificate_Full(Protocol):
 
     def get_human_readable(self, fp_str_):
         lit_fp = eval_fp_str_general(fp_str_)
-        fp_h = {}
-        fp_h['serial_number'] = lit_fp[0][0]
-        fp_h['signature_algorithm'] = unhexlify(lit_fp[1][0]).decode()
-        fp_h['issuer'] = {}
+        fp_h = {
+            'serial_number': lit_fp[0][0],
+            'signature_algorithm': unhexlify(lit_fp[1][0]).decode(),
+            'issuer': {},
+        }
+
         for issuer in lit_fp[2]:
             fp_h['issuer'][unhexlify(issuer[0][0]).decode()] = unhexlify(issuer[1][0]).decode()
         fp_h['validity_not_before'] = unhexlify(lit_fp[3][0]).decode()

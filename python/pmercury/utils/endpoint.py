@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import json
@@ -11,7 +12,7 @@ from copy import deepcopy
 from collections import defaultdict, OrderedDict
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.pmercury_utils import *
 from pmercury.utils.os_detection import *
 
@@ -38,8 +39,7 @@ class Endpoint:
             self.summary[fp_type] = {}
 
         if fp_ not in self.summary[fp_type]:
-            self.summary[fp_type][fp_] = {}
-            self.summary[fp_type][fp_]['count'] = 0
+            self.summary[fp_type][fp_] = {'count': 0}
         self.summary[fp_type][fp_]['count'] += 1
 
         if fp_type in flow:
@@ -86,9 +86,7 @@ class Endpoints:
 
     def write_all(self, out):
         for id_ in self.endpoints:
-            o_ = {}
-            o_['identifier'] = id_
-            o_['fingerprints'] = self.endpoints[id_].summary
+            o_ = {'identifier': id_, 'fingerprints': self.endpoints[id_].summary}
             tmp_os = self.endpoints[id_].get_os()
             if tmp_os != None:
                 o_['os_info'] = tmp_os
@@ -112,11 +110,15 @@ class Endpoints:
 
     def get_src(self, flow, fp_type):
         src = flow['src_ip']
-        if fp_type == 'dhcp':
-            if fp_type in flow and 'client_mac_address' in flow[fp_type] and 'requested_ip' in flow[fp_type]:
-                mac = flow[fp_type]['client_mac_address']
-                src = flow[fp_type]['requested_ip']
-                self.ip_to_mac[flow[fp_type]['requested_ip']] = mac
+        if (
+            fp_type == 'dhcp'
+            and fp_type in flow
+            and 'client_mac_address' in flow[fp_type]
+            and 'requested_ip' in flow[fp_type]
+        ):
+            mac = flow[fp_type]['client_mac_address']
+            src = flow[fp_type]['requested_ip']
+            self.ip_to_mac[flow[fp_type]['requested_ip']] = mac
 
         if src in self.ip_to_mac:
             src_mac = self.ip_to_mac[src]

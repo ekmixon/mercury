@@ -5,7 +5,7 @@ import json
 import math
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.pmercury_utils import *
 
 
@@ -18,7 +18,7 @@ class LogR:
     def classify(self, x):
         scores = []
         for i in range(len(self.intc)):
-            exp_ = (self.intc[i] + sum([a*b for a,b in zip(self.coef[i], x)]))
+            exp_ = self.intc[i] + sum(a*b for a,b in zip(self.coef[i], x))
             scores.append(1/(1+math.e**(-exp_)))
         max_ = scores.index(max(scores))
         return self.labels[max_]
@@ -82,7 +82,7 @@ class OSDetection:
             os_info = self.fingerprint_db_http[str_repr]['os_info']
             multiplier = 2
 
-        if os_info == None:
+        if os_info is None:
             return sample
 
         for k in os_info:
@@ -93,7 +93,7 @@ class OSDetection:
 
 
     def normalize_sample(self, sample):
-        tcp_  = sample[0:self.os_len]
+        tcp_ = sample[:self.os_len]
         tls_  = sample[self.os_len:2*self.os_len]
         http_ = sample[2*self.os_len:3*self.os_len]
         s1_ = sum(tcp_)
@@ -102,8 +102,7 @@ class OSDetection:
         tcp_s  = list(map(lambda f_: f_/s1_ if s1_ > 0.0 else f_, tcp_))
         tls_s  = list(map(lambda f_: f_/s2_ if s2_ > 0.0 else f_, tls_))
         http_s = list(map(lambda f_: f_/s3_ if s3_ > 0.0 else f_, http_))
-        r = []
-        r.extend(tcp_s)
+        r = list(tcp_s)
         r.extend(tls_s)
         r.extend(http_s)
         return r

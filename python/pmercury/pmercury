@@ -5,6 +5,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import json
@@ -14,7 +15,7 @@ import optparse
 from socket import AF_INET, AF_INET6, inet_ntop
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.config_parser import parse_config
 from pmercury.utils.packet_proc import pkt_proc
 
@@ -50,16 +51,16 @@ class Fingerprinter:
         if analyze or human_readable or group or endpoint or experimental:
             self.fast_path = False
 
-        if output == None:
+        if output is None:
             self.out_file_pointer = sys.stdout
         else:
             self.out_file_pointer = open(output, 'w', buffering=8192*64)
 
         if endpoint:
-            if output == None:
+            if output is None:
                 self.endpoint_file_pointer = sys.stdout
             else:
-                self.endpoint_file_pointer = open('endpoint_'+output, 'w', buffering=8192*64)
+                self.endpoint_file_pointer = open(f'endpoint_{output}', 'w', buffering=8192*64)
 
         config = parse_config('../config.yaml')
 
@@ -165,17 +166,18 @@ class Fingerprinter:
                         if 'readable' not in flow:
                             flow['readable'] = {}
                         flow['readable'][fp_type] = desc_
-                    if fp_type == 'tls_server':
-                        if 'tls' in flow and 'server_certs' in flow['tls']:
-                            desc_ = self.parsers['server_certs'].get_human_readable(flow['tls']['server_certs'])
-                            if desc_ != None:
-                                if 'readable' not in flow:
-                                    flow['readable'] = {}
-                                flow['readable']['server_certs'] = desc_
+                    if (
+                        fp_type == 'tls_server'
+                        and 'tls' in flow
+                        and 'server_certs' in flow['tls']
+                    ):
+                        desc_ = self.parsers['server_certs'].get_human_readable(flow['tls']['server_certs'])
+                        if desc_ != None:
+                            if 'readable' not in flow:
+                                flow['readable'] = {}
+                            flow['readable']['server_certs'] = desc_
                 if self.analyze:
-                    context = None
-                    if fp_type in flow:
-                        context = flow[fp_type]
+                    context = flow[fp_type] if fp_type in flow else None
                     proc_info = self.parsers[fp_type].proc_identify(flow['fingerprints'][fp_type], context,
                                                                     flow['dst_ip'], flow['dst_port'], self.num_procs)
                     if proc_info != None:
@@ -218,15 +220,15 @@ class Fingerprinter:
         else: # currently skip other types
             return -1
 
-        data_len = len(buf)
         if protocol == 6:
             tcp_offset = ip_offset+ip_length
+            data_len = len(buf)
             if tcp_offset+20 > data_len:
                 return -1
-            tcp_length = (buf[tcp_offset+12] >> 0x04)*4
-            app_offset = tcp_offset + tcp_length
-
             if self.experimental:
+                tcp_length = (buf[tcp_offset+12] >> 0x04)*4
+                app_offset = tcp_offset + tcp_length
+
                 for _,fparser_ in self.flow_parsers:
                     ffp_type, ffp_str_, fcontext_ = fparser_.fingerprint(buf, ip_offset, tcp_offset, app_offset,
                                                                          ip_type, ip_length, data_len)
@@ -271,11 +273,10 @@ class Fingerprinter:
                 if 'readable' not in flow:
                     flow['readable'] = {}
                 flow['readable'][fp_type] = desc_
-        if self.analyze:
-            if fp_type in self.parsers:
-                proc_info = self.parsers[fp_type].proc_identify(fp_str_, context_, dst_ip, dst_port, self.num_procs)
-                if proc_info != None:
-                    flow['analysis'] = proc_info
+        if self.analyze and fp_type in self.parsers:
+            proc_info = self.parsers[fp_type].proc_identify(fp_str_, context_, dst_ip, dst_port, self.num_procs)
+            if proc_info != None:
+                flow['analysis'] = proc_info
 
         if self.group:
             self.update_flow_cache(flow)
@@ -305,9 +306,7 @@ class Fingerprinter:
                 flow['readable'][fp_type] = desc_
 
         if self.analyze:
-            endpoint = None
-            if self.endpoint:
-                endpoint = self.endpoint_model.get_endpoint(src_ip)
+            endpoint = self.endpoint_model.get_endpoint(src_ip) if self.endpoint else None
             proc_info = self.parsers[fp_type].proc_identify(flow['fingerprints'][fp_type], context, flow['dst_ip'],
                                                             flow['dst_port'], self.num_procs, endpoint, False, debug)
             if proc_info != None:
@@ -340,9 +339,7 @@ class Fingerprinter:
 
         # add fingerprint
         for k in flow['fingerprints']:
-            packet_fp = {}
-            packet_fp['event_start'] = flow['event_start']
-            packet_fp[k] = flow['fingerprints'][k]
+            packet_fp = {'event_start': flow['event_start'], k: flow['fingerprints'][k]}
             if k in flow:
                 if k not in self.flow_cache[flow_key]:
                     self.flow_cache[flow_key][k] = {}
@@ -388,8 +385,8 @@ class Fingerprinter:
         dst_port = str(flow['dst_port'])
         protocol = str(flow['protocol'])
 
-        fk   = src_ip + ':' + dst_ip + ':' + src_port + ':' + dst_port + ':' + protocol
-        r_fk = dst_ip + ':' + src_ip + ':' + dst_port + ':' + src_port + ':' + protocol
+        fk = f'{src_ip}:{dst_ip}:{src_port}:{dst_port}:{protocol}'
+        r_fk = f'{dst_ip}:{src_ip}:{dst_port}:{src_port}:{protocol}'
 
         return fk, r_fk
 
@@ -404,9 +401,11 @@ class Fingerprinter:
 
 
     def get_database_entry(self, fp_str, fp_type):
-        if not hasattr(self.parsers[fp_type], 'get_database_entry'):
-            return None
-        return self.parsers[fp_type].get_database_entry(fp_str, None)
+        return (
+            self.parsers[fp_type].get_database_entry(fp_str, None)
+            if hasattr(self.parsers[fp_type], 'get_database_entry')
+            else None
+        )
 
 
     def write_record(self, flow_repr):
@@ -435,7 +434,7 @@ class Fingerprinter:
 
 
     def close_files(self):
-        if self.out_file_pointer != None and self.out_file_pointer != sys.stdout:
+        if self.out_file_pointer not in [None, sys.stdout]:
             self.out_file_pointer.close()
         if self.endpoint and self.endpoint_file_pointer != None:
             self.endpoint_file_pointer.close()
@@ -476,9 +475,7 @@ def main():
     input_files = []
     if options.pcap_file != None:
         input_files.append(options.pcap_file)
-    for x in args:
-        if '.pcap' in x:
-            input_files.append(x)
+    input_files.extend(x for x in args if '.pcap' in x)
     if options.capture_interface != None:
         input_files.append(options.capture_interface)
 

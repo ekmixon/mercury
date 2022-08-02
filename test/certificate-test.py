@@ -23,8 +23,7 @@ def get_PEM_string(input_str):
     end_str = '-----END CERTIFICATE-----\n'
     # as per RFC 7468, split base64 encoded string into 64 byte chunks
     c_str = '\n'.join(split_by_width(input_str, 64))
-    cert_str = '\n'.join([begin_str, c_str, end_str])
-    return cert_str
+    return '\n'.join([begin_str, c_str, end_str])
 
 def get_certificate(pem_str):
     try:
@@ -43,25 +42,26 @@ def process_json(json_file):
     with open(json_file) as f:
         for line in f:
             a = json.loads(line)
-            if 'tls' in a:
-                if 'server' in a['tls']:
-                    if 'certs' in a['tls']['server']:
-                        cert_list = a['tls']['server']['certs']
+            if (
+                'tls' in a
+                and 'server' in a['tls']
+                and 'certs' in a['tls']['server']
+            ):
+                cert_list = a['tls']['server']['certs']
                         # compute maximum certificates present in a packet
-                        if max_certs < len(cert_list):
-                            max_certs = len(cert_list)
-                        for c in cert_list:
-                            pem_str = get_PEM_string(c['base64'])
-                            cert_count += 1
-                            cert = get_certificate(pem_str)
-                            if (cert == None):
-                                bad_cert += 1
-                            else:
-                                good_cert += 1
-                                #ofilename = "cert" + str(cert_count) + ".pem"
-                                #with open(ofilename, "w") as ofile:
-                                #    ofile.write(pem_str)
-                                #print("cert_name {}, cert.serial_number {}\n".format(ofilename, cert.serial_number))
+                max_certs = max(max_certs, len(cert_list))
+                for c in cert_list:
+                    pem_str = get_PEM_string(c['base64'])
+                    cert_count += 1
+                    cert = get_certificate(pem_str)
+                    if cert is None:
+                        bad_cert += 1
+                    else:
+                        good_cert += 1
+                        #ofilename = "cert" + str(cert_count) + ".pem"
+                        #with open(ofilename, "w") as ofile:
+                        #    ofile.write(pem_str)
+                        #print("cert_name {}, cert.serial_number {}\n".format(ofilename, cert.serial_number))
 
     return cert_count, good_cert, bad_cert, max_certs
 
@@ -82,15 +82,14 @@ def main():
     max_certs = 0
 
     if (os.path.isfile(inputfilename)):
-        print("Processing file {}...".format(inputfilename))
+        print(f"Processing file {inputfilename}...")
         cert_count1, good_cert1, bad_cert1, max_certs1 = process_json(inputfilename)
         cert_count += cert_count1
         good_cert += good_cert1
         bad_cert += bad_cert1
-        if (max_certs < max_certs1):
-            max_certs = max_certs1
+        max_certs = max(max_certs, max_certs1)
     elif (os.path.isdir(inputfilename)):
-        print("Processing directory {}...".format(inputfilename))
+        print(f"Processing directory {inputfilename}...")
         os.chdir(inputfilename)
         file_list = [ f for f in os.listdir(os.curdir) if os.path.isfile(f) ]
         for f in file_list:

@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import copy
@@ -14,7 +15,7 @@ from sys import path
 from socket import htons
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.tls_utils import *
 from pmercury.utils.tls_constants import *
 from pmercury.utils.pmercury_utils import *
@@ -53,7 +54,7 @@ class TLS():
             transition_probs_file = find_resource_path('resources/transition_probs.csv.gz')
             self.transition_probs = {}
             cmd = 'gzcat' if sys.platform == 'darwin' else 'zcat'
-            for line in os.popen(cmd + ' %s' % (transition_probs_file), mode='r', buffering=8192*256):
+            for line in os.popen(cmd + f' {transition_probs_file}', mode='r', buffering=8192*256):
                 t_ = line.strip().split(',')
                 if t_[1] not in self.transition_probs:
                     self.transition_probs[t_[1]] = {}
@@ -80,7 +81,7 @@ class TLS():
                 self.fp_db[fp_['str_repr']] = fp_
         else:
             cmd = 'gzcat' if sys.platform == 'darwin' else 'zcat'
-            for line in os.popen(cmd + ' %s' % (fp_database), mode='r', buffering=8192*256):
+            for line in os.popen(cmd + f' {fp_database}', mode='r', buffering=8192*256):
                 fp_ = json.loads(line)
                 self.fp_db[fp_['str_repr']] = fp_
         if 'malware' not in self.fp_db[fp_['str_repr']]['process_info'][0]:
@@ -94,14 +95,14 @@ class TLS():
     def proto_identify(data, offset, data_len):
         if data_len-offset < 16:
             return False
-        if (data[offset]    == 22 and
-            data[offset+1]  ==  3 and
-            data[offset+2]  <=  3 and
-            data[offset+5]  ==  1 and
-            data[offset+9]  ==  3 and
-            data[offset+10] <=  3):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 1
+            and data[offset + 9] == 3
+            and data[offset + 10] <= 3
+        )
 
 
     @staticmethod
@@ -130,7 +131,7 @@ class TLS():
         cs_ = degrease_type_code(data, offset)
         if cipher_suites_length > 2:
             cs_ += data[offset+2:offset+cipher_suites_length].hex()
-        c.append('(%s)' % cs_)
+        c.append(f'({cs_})')
         offset += cipher_suites_length
         if offset >= data_len:
             c.append('()')
@@ -168,7 +169,7 @@ class TLS():
             if ext_len+4 > ext_total_len:
                 c.append(')')
                 return ''.join(c), context
-            c.append('(%s)' % tmp_fp_ext)
+            c.append(f'({tmp_fp_ext})')
 
             ext_total_len -= 4 + ext_len
         c.append(')')
@@ -192,7 +193,7 @@ class TLS():
                 return {'process': 'Unknown', 'score': 0.0, 'malware': 0, 'p_malware': 0.0, 'category': 'Unknown'}
             lit_fp = eval_fp_str(fp_str_)
             approx_str_ = self.find_approx_match(lit_fp)
-            if approx_str_ == None:
+            if approx_str_ is None:
                 fp_ = self.gen_unknown_fingerprint(fp_str_)
                 self.fp_db[fp_str_] = fp_
                 if self.MALWARE_DB:
@@ -209,7 +210,7 @@ class TLS():
     @functools.lru_cache(maxsize=MAX_CACHED_RESULTS)
     def identify(self, fp_str_, server_name, dest_addr, dest_port, list_procs, endpoint=None, debug=None):
         fp_ = self.get_database_entry(fp_str_, None)
-        if fp_ == None:
+        if fp_ is None:
             # if malware data is in the database, report malware scores
             if self.MALWARE_DB:
                 return {'process': 'Unknown', 'score': 0.0, 'malware': 0, 'p_malware': 0.0, 'category': 'Unknown'}
@@ -239,8 +240,12 @@ class TLS():
             if len(r_) > 1 and r_[1]['malware'] == False:
                 r_.pop(0)
             else:
-                score_sum_ = sum([x_['score'] for x_ in r_])
-                malware_score_ = sum([x_['score'] for x_ in r_ if x_['malware'] == 1])/score_sum_
+                score_sum_ = sum(x_['score'] for x_ in r_)
+                malware_score_ = (
+                    sum(x_['score'] for x_ in r_ if x_['malware'] == 1)
+                    / score_sum_
+                )
+
                 if malware_score_ > 0.99:
                     r_.pop(0)
 
@@ -249,9 +254,12 @@ class TLS():
         process_name = self.app_families[process_name] if process_name in self.app_families else process_name
 
         # package the most probable process
-        score_sum_ = sum([x_['score'] for x_ in r_])
+        score_sum_ = sum(x_['score'] for x_ in r_)
         if self.MALWARE_DB:
-            malware_score_ = sum([x_['score'] for x_ in r_ if x_['malware'] == 1])/score_sum_
+            malware_score_ = (
+                sum(x_['score'] for x_ in r_ if x_['malware'] == 1) / score_sum_
+            )
+
             out_ = {'process':process_name, 'score':r_[0]['score'], 'malware':int(r_[0]['malware']),
                     'p_malware':malware_score_, 'category':r_[0]['category']}
         else:
@@ -259,7 +267,7 @@ class TLS():
 
         # return the top-n most probable processes is list_procs > 0
         if list_procs > 0:
-            r_proc_ = r_[0:list_procs]
+            r_proc_ = r_[:list_procs]
             for p_ in r_proc_:
                 p_['score'] /= score_sum_
             out_['probable_processes'] = r_proc_
@@ -295,11 +303,7 @@ class TLS():
 
         if endpoint != None:
             gpn = self.app_families[cur_proc] if cur_proc in self.app_families else cur_proc
-            if gpn in endpoint.strong_procs:
-                score_ += math.log(.1)
-            else:
-                score_ += math.log(.05)
-
+            score_ += math.log(.1) if gpn in endpoint.strong_procs else math.log(.05)
             if server_name in strong_domains and gpn == strong_domains[server_name]:
                 score_ += math.log(1.0)
             else:
@@ -369,10 +373,7 @@ class TLS():
             t_sim_set.append((1.0-2*score_/float(len(target_)+len(test_)), k))
 
         t_sim_set.sort()
-        if len(t_sim_set) == 0:
-            return None
-
-        return t_sim_set[0][1]
+        return t_sim_set[0][1] if t_sim_set else None
 
 
     def find_approximate_matches_set(self, tls_params, fp_str=None, source_filter=None, key_filter=None):
@@ -399,13 +400,12 @@ class TLS():
             t_scores.append((s_, k))
         t_scores.sort()
         t_scores.reverse()
-        return t_scores[0:100]
+        return t_scores[:100]
 
 
     @functools.lru_cache(maxsize=MAX_CACHED_RESULTS)
     def gen_unknown_fingerprint(self, fp_str_):
-        fp_ = {}
-        fp_['str_repr'] = fp_str_
+        fp_ = {'str_repr': fp_str_}
         lit_fp = eval_fp_str(fp_str_)
         if len(lit_fp) < 2 or len(lit_fp[1]) < 1:
             fp_['error'] = 'fingerprint string parsing error'
@@ -423,8 +423,7 @@ class TLS():
 
     def get_human_readable(self, fp_str_):
         lit_fp = eval_fp_str(fp_str_)
-        fp_h = {}
-        fp_h['version'] = get_version_from_str(lit_fp[0])
+        fp_h = {'version': get_version_from_str(lit_fp[0])}
         fp_h['cipher_suites'] = get_cs_from_str(lit_fp[1])
         fp_h['extensions'] = []
         if len(lit_fp) > 2:

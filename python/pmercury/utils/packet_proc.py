@@ -116,7 +116,7 @@ def pkt_proc(ts, data):
             fp_str_, context_ = DHCP.fingerprint(data, app_offset, data_len)
             fp_type = 'dhcp'
 
-    if fp_str_ == None:
+    if fp_str_ is None:
         return None
 
     src_port = int.from_bytes(buf[prot_offset:prot_offset+2], byteorder='big')
@@ -152,7 +152,7 @@ def pkt_proc(ts, data):
             flow['tls'] = {}
         flow['tls'][fp_type] = fp_str_
 
-    if context_ != None and context_ != []:
+    if context_ not in [None, []]:
         flow[fp_type] = {}
         for x_ in context_:
             flow[fp_type][x_['name']]  = x_['data']
@@ -165,7 +165,7 @@ def pkt_proc(ts, data):
                 flow['tls'] = {}
             flow['tls'][fp_type_2] = fp_str_2_
 
-        if context_2_ != None and context_2_ != []:
+        if context_2_ not in [None, []]:
             flow[fp_type_2] = {}
             for x_ in context_2_:
                 flow[fp_type_2][x_['name']]  = x_['data']

@@ -5,6 +5,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import pcap
@@ -14,7 +15,7 @@ import importlib
 from importlib import machinery
 from statistics import mean, stdev
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../../')
 
 
 def performance_test(input_file, output_file, fp_db, analyze, human_readable, experimental, group, num_procs, loops):
@@ -35,7 +36,7 @@ def performance_test(input_file, output_file, fp_db, analyze, human_readable, ex
     print('Initialization Time:\t%0.3fs' % load_time)
 
     loop_times = []
-    for l in range(loops):
+    for _ in range(loops):
         start = time.time()
         fp.process_pcap(input_file)
 

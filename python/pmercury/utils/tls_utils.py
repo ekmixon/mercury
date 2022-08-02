@@ -3,24 +3,80 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import ast
 import json
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.tls_constants import *
 from pmercury.utils.pmercury_utils import *
 
-grease_ = set(['0a0a','1a1a','2a2a','3a3a','4a4a','5a5a','6a6a','7a7a',
-               '8a8a','9a9a','aaaa','baba','caca','dada','eaea','fafa'])
+grease_ = {
+    '0a0a',
+    '1a1a',
+    '2a2a',
+    '3a3a',
+    '4a4a',
+    '5a5a',
+    '6a6a',
+    '7a7a',
+    '8a8a',
+    '9a9a',
+    'aaaa',
+    'baba',
+    'caca',
+    'dada',
+    'eaea',
+    'fafa',
+}
 
-grease_single_int_ = set([10,26,42,58,74,90,106,122,138,154,170,186,202,218,234,250])
 
-ext_data_extract_ = set(['0001','0005','0007','0008','0009','000a','000b',
-                         '000d','000f','0010','0011','0013','0014','0018',
-                         '001b','001c','002b','002d','0032','5500'])
+grease_single_int_ = {
+    10,
+    26,
+    42,
+    58,
+    74,
+    90,
+    106,
+    122,
+    138,
+    154,
+    170,
+    186,
+    202,
+    218,
+    234,
+    250,
+}
+
+
+ext_data_extract_ = {
+    '0001',
+    '0005',
+    '0007',
+    '0008',
+    '0009',
+    '000a',
+    '000b',
+    '000d',
+    '000f',
+    '0010',
+    '0011',
+    '0013',
+    '0014',
+    '0018',
+    '001b',
+    '001c',
+    '002b',
+    '002d',
+    '0032',
+    '5500',
+}
+
 ext_data_extract_ = ext_data_extract_.union(grease_)
 
 
@@ -36,10 +92,10 @@ if os.name == 'nt':
         break
 else:
     cmd = 'gzcat' if sys.platform == 'darwin' else 'zcat'
-    for line in os.popen(cmd + ' %s' % (imp_date_cs_file)):
+    for line in os.popen(cmd + f' {imp_date_cs_file}'):
         imp_date_cs_data = json.loads(line)
         break
-    for line in os.popen(cmd + ' %s' % (imp_date_ext_file)):
+    for line in os.popen(cmd + f' {imp_date_ext_file}'):
         imp_date_ext_data = json.loads(line)
         break
 
@@ -55,7 +111,7 @@ def extract_server_name(data, offset, data_len):
 
 
 def eval_fp_str_general(fp_str_):
-    fp_str_ = '(%s)' % fp_str_
+    fp_str_ = f'({fp_str_})'
     fp_str_ = fp_str_.replace('(','["').replace(')','"]').replace('][','],[')
     new_str_ = fp_str_.replace('["[','[[').replace(']"]',']]')
     while new_str_ != fp_str_:
@@ -98,7 +154,7 @@ def get_ext_from_str(exts_, convert=True, mode='client'):
     for ext in exts_:
         if len(ext) == 0:
             break
-        ext_type_ = ext[0:4]
+        ext_type_ = ext[:4]
         ext_type_str_kind = str(int(ext_type_,16))
         if ext_type_str_kind in imp_date_ext_data and convert:
             ext_type_ = imp_date_ext_data[ext_type_str_kind]['name']
@@ -119,16 +175,12 @@ def get_implementation_date(cs_str_): # @TODO: add extension
         cs_ = cs_str_[i:i+4]
         if cs_ in imp_date_cs_data:
             dates_.add(imp_date_cs_data[cs_]['date'])
-    dates_ = list(dates_)
-    dates_.sort()
-    if len(dates_) > 0:
-        return dates_[-1], dates_[0]
-    else:
-        return None, None
+    dates_ = sorted(dates_)
+    return (dates_[-1], dates_[0]) if dates_ else (None, None)
 
 
 def parse_extension_data(ext_type, ext_data_, mode):
-    ext_len = int(ext_data_[0:4],16)
+    ext_len = int(ext_data_[:4], 16)
     ext_data = ext_data_[4:]
 
     if ext_type == 'application_layer_protocol_negotiation':
@@ -180,21 +232,29 @@ def degrease_type_code(data, offset):
 # helper to normalize grease within supported_groups and supported_versions
 def degrease_ext_data(data, offset, ext_type, ext_length, ext_value):
     degreased_ext_value = b''
-    if ext_type == '000a': # supported_groups
+    if ext_type == '000a':
         degreased_ext_value += data[offset:offset+2]
         for i in range(2,ext_length,2):
-            if len(data) >= offset+i+1 and data[offset+i] in grease_single_int_ and data[offset+i] == data[offset+i+1]:
-                degreased_ext_value += b'\x0a\x0a'
-            else:
-                degreased_ext_value += data[offset+i:offset+i+2]
+            degreased_ext_value += (
+                b'\x0a\x0a'
+                if len(data) >= offset + i + 1
+                and data[offset + i] in grease_single_int_
+                and data[offset + i] == data[offset + i + 1]
+                else data[offset + i : offset + i + 2]
+            )
+
         return degreased_ext_value
-    elif ext_type == '002b': # supported_versions
+    elif ext_type == '002b':
         degreased_ext_value += data[offset:offset+1]
         for i in range(1,ext_length,2):
-            if len(data) >= offset+i+1 and data[offset+i] in grease_single_int_ and data[offset+i] == data[offset+i+1]:
-                degreased_ext_value += b'\x0a\x0a'
-            else:
-                degreased_ext_value += data[offset+i:offset+i+2]
+            degreased_ext_value += (
+                b'\x0a\x0a'
+                if len(data) >= offset + i + 1
+                and data[offset + i] in grease_single_int_
+                and data[offset + i] == data[offset + i + 1]
+                else data[offset + i : offset + i + 2]
+            )
+
         return degreased_ext_value
 
     return ext_value
@@ -203,10 +263,11 @@ def degrease_ext_data(data, offset, ext_type, ext_length, ext_value):
 def supported_groups(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:4], 16)
-    info['supported_groups_list_length'] = ext_len
-    info['supported_groups'] = []
+    info = {
+        'supported_groups_list_length': int(data[:4], 16),
+        'supported_groups': [],
+    }
+
     offset = 4
     while offset < length*2:
         if int(data[offset:offset+4], 16) in TLS_SUPPORTED_GROUPS:
@@ -221,17 +282,18 @@ def supported_groups(data, length):
 def supported_versions(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:2], 16)
-    info['supported_versions_list_length'] = ext_len
-    info['supported_versions'] = []
+    info = {
+        'supported_versions_list_length': int(data[:2], 16),
+        'supported_versions': [],
+    }
+
     offset = 2
     while offset < length*2:
         tmp_data = data[offset:offset+4]
         if tmp_data in TLS_VERSION:
             info['supported_versions'].append(TLS_VERSION[tmp_data])
         else:
-            info['supported_versions'].append('Unknown Version (%s)' % tmp_data)
+            info['supported_versions'].append(f'Unknown Version ({tmp_data})')
         offset += 4
 
     return info
@@ -242,20 +304,17 @@ def supported_versions_server(data, length):
         return ''
     info = {}
     tmp_data = data[:4]
-    if tmp_data in TLS_VERSION:
-        return TLS_VERSION[tmp_data]
-    else:
-        return 'Unknown Version (%s)' % tmp_data
-
-    return info
+    return (
+        TLS_VERSION[tmp_data]
+        if tmp_data in TLS_VERSION
+        else f'Unknown Version ({tmp_data})'
+    )
 
 
 def psk_key_exchange_modes(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:2], 16)
-    info['psk_key_exchange_modes_length'] = ext_len
+    info = {'psk_key_exchange_modes_length': int(data[:2], 16)}
     mode = int(data[2:4], 16)
     info['psk_key_exchange_mode'] = TLS_PSK_KEY_EXCHANGE_MODES[mode]
 
@@ -265,16 +324,15 @@ def psk_key_exchange_modes(data, length):
 def key_share_client(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:4], 16)
-    info['key_share_length'] = ext_len
-    info['key_share_entries'] = []
+    info = {'key_share_length': int(data[:4], 16), 'key_share_entries': []}
     offset = 4
     while offset < length*2:
-        tmp_obj = {}
         tmp_data = data[offset:offset+4]
-        tmp_obj['group'] = TLS_SUPPORTED_GROUPS[int(tmp_data,16)]
-        tmp_obj['key_exchange_length'] = int(data[offset+4:offset+8], 16)
+        tmp_obj = {
+            'group': TLS_SUPPORTED_GROUPS[int(tmp_data, 16)],
+            'key_exchange_length': int(data[offset + 4 : offset + 8], 16),
+        }
+
         tmp_obj['key_exchange'] = data[offset+8:offset+8+2*tmp_obj['key_exchange_length']]
         info['key_share_entries'].append(tmp_obj)
         offset += 8 + 2*tmp_obj['key_exchange_length']
@@ -285,10 +343,8 @@ def key_share_client(data, length):
 def ec_point_formats(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:2], 16)
-    info['ec_point_formats_length'] = ext_len
-    info['ec_point_formats'] = []
+    ext_len = int(data[:2], 16)
+    info = {'ec_point_formats_length': ext_len, 'ec_point_formats': []}
     for i in range(ext_len):
         tmp_data = data[2*i+2:2*i+4]
         if tmp_data in TLS_EC_POINT_FORMATS:
@@ -302,10 +358,12 @@ def ec_point_formats(data, length):
 def status_request(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    info['certificate_status_type'] = TLS_CERTIFICATE_STATUS_TYPE[data[0:2]]
     offset = 2
-    info['responder_id_list_length'] = int(data[offset:offset+4], 16)
+    info = {
+        'certificate_status_type': TLS_CERTIFICATE_STATUS_TYPE[data[:2]],
+        'responder_id_list_length': int(data[offset : offset + 4], 16),
+    }
+
     offset += info['responder_id_list_length']*2 + 4
     info['request_extensions_length'] = int(data[offset:offset+4], 16)
 
@@ -315,24 +373,25 @@ def status_request(data, length):
 def signature_algorithms(data, length):
     if len(data) < 2:
         return ''
-    info = {}
-    ext_len = int(data[0:4], 16)
-    info['signature_hash_algorithms_length'] = ext_len
-    info['algorithms'] = []
+    info = {
+        'signature_hash_algorithms_length': int(data[:4], 16),
+        'algorithms': [],
+    }
+
     offset = 4
     while offset < length*2:
         tmp_data = data[offset:offset+4]
         if tmp_data in TLS_SIGNATURE_HASH_ALGORITHMS:
             info['algorithms'].append(TLS_SIGNATURE_HASH_ALGORITHMS[tmp_data])
         else:
-            info['algorithms'].append('unknown(%s)' % tmp_data)
+            info['algorithms'].append(f'unknown({tmp_data})')
         offset += 4
 
     return info
 
 
 def parse_application_layer_protocol_negotiation(data, length):
-    alpn_len = int(data[0:4], 16)
+    alpn_len = int(data[:4], 16)
     alpn_offset = 4
     alpn_data = []
     while alpn_offset < length*2:
@@ -345,41 +404,28 @@ def parse_application_layer_protocol_negotiation(data, length):
 
 
 def get_tls_params(fp_):
-    cs_ = []
-    for i in range(0,len(fp_[1][0]),4):
-        cs_.append(fp_[1][0][i:i+4])
+    cs_ = [fp_[1][0][i:i+4] for i in range(0,len(fp_[1][0]),4)]
     cs_4_ = get_ngram(cs_, 4)
 
     ext_ = []
     if len(fp_) > 2 and fp_[2] != ['']:
-        for t_ext_ in fp_[2]:
-            ext_.append('ext_' + t_ext_[0][0:4] + '::' + t_ext_[0][4:])
-
+        ext_.extend('ext_' + t_ext_[0][:4] + '::' + t_ext_[0][4:] for t_ext_ in fp_[2])
     return [cs_4_, ext_]
 
 
 def get_sequence(fp_):
-    seq = []
     cs_ = fp_[1]
-    for i in range(0,len(cs_),4):
-        seq.append(cs_[i:i+4])
+    seq = [cs_[i:i+4] for i in range(0,len(cs_),4)]
     ext_ = []
     if len(fp_) > 2 and fp_[2] != ['']:
-        for t_ext_ in fp_[2]:
-            seq.append('ext_' + t_ext_[0:4] + '::' + t_ext_[4:])
+        seq.extend('ext_' + t_ext_[:4] + '::' + t_ext_[4:] for t_ext_ in fp_[2])
     return seq
 
 
 def get_ngram(l, ngram):
-    l_ = []
-    for i in range(0,len(l)-ngram):
-        s_ = ''
-        for j in range(ngram):
-            s_ += l[i+j]
-        l_.append(s_)
-    if len(l_) == 0:
-        l_ = l
-    return l_
+    return [
+        ''.join(l[i + j] for j in range(ngram)) for i in range(len(l) - ngram)
+    ] or l
 
 
 

@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import json
@@ -12,7 +13,7 @@ from sys import path
 from socket import htons
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.tls_utils import *
 
 
@@ -28,14 +29,14 @@ class DTLS():
     def proto_identify(data, offset, data_len):
         if data_len-offset < 27:
             return False
-        if (data[offset]    ==  22 and
-            data[offset+1]  == 254 and
-            data[offset+2]  >= 253 and
-            data[offset+13] ==   1 and
-            data[offset+25] == 254 and
-            data[offset+26] >= 253):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 254
+            and data[offset + 2] >= 253
+            and data[offset + 13] == 1
+            and data[offset + 25] == 254
+            and data[offset + 26] >= 253
+        )
 
 
     @staticmethod
@@ -70,7 +71,7 @@ class DTLS():
         cs_ = degrease_type_code(data, offset)
         if cipher_suites_length > 2:
             cs_ += data[offset+2:offset+cipher_suites_length].hex()
-        c.append('(%s)' % cs_)
+        c.append(f'({cs_})')
         offset += cipher_suites_length
         if offset >= data_len:
             c.append('()')
@@ -108,7 +109,7 @@ class DTLS():
             if ext_len+4 > ext_total_len:
                 c.append(')')
                 return ''.join(c), server_name
-            c.append('(%s)' % tmp_fp_ext)
+            c.append(f'({tmp_fp_ext})')
 
             ext_total_len -= 4 + ext_len
         c.append(')')

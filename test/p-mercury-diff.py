@@ -23,9 +23,7 @@ def get_flow_key(record):
 
 
 def get_keys(obj, k):
-    if k in obj:
-        return set(obj[k].keys())
-    return set([])
+    return set(obj[k].keys()) if k in obj else set([])
 
 def read_data(filename):
     total = 0
@@ -45,15 +43,10 @@ def contextual_data_consistency(rec0, rec1, flow_key):
     mismatches = {}
     missing0   = {}
     missing1   = {}
-    raw_data   = {}
-
     keys0 = set(rec0.keys())
     keys1 = set(rec1.keys())
 
-    raw_data['mismatch'] = {}
-    raw_data['missing0'] = {}
-    raw_data['missing1'] = {}
-
+    raw_data = {'mismatch': {}, 'missing0': {}, 'missing1': {}}
     for k in CONTEXTUAL_DATA_KEYS:
         matches[k]    = defaultdict(int)
         mismatches[k] = defaultdict(int)
@@ -90,8 +83,6 @@ def fingerprint_consistency(rec0, rec1, flow_key):
     mismatches = defaultdict(int)
     missing0   = defaultdict(int)
     missing1   = defaultdict(int)
-    raw_data   = {}
-
     fps0   = {}
     fps1   = {}
     types0 = set([])
@@ -103,9 +94,7 @@ def fingerprint_consistency(rec0, rec1, flow_key):
         fps1 = rec1['fingerprints']
         types1 = set(fps1.keys())
 
-    raw_data['mismatch'] = {}
-    raw_data['missing0'] = {}
-    raw_data['missing1'] = {}
+    raw_data = {'mismatch': {}, 'missing0': {}, 'missing1': {}}
     for k in types0.union(types1):
         raw_data['mismatch'][k] = []
         raw_data['missing0'][k] = []

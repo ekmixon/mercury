@@ -47,8 +47,8 @@ class HTTP2:
     def get_human_readable(self, fp_str_):
         t_ = [bytes.fromhex(x[1:]) for x in fp_str_.split(')')[:-1]]
         fp_h = []
-        for i in range(len(t_)):
-            field = t_[i].split(b': ',1)
+        for item in t_:
+            field = item.split(b': ', 1)
             fp_h.append({field[0].decode(): field[1].decode()})
         return fp_h
 
@@ -135,7 +135,7 @@ class HTTP2:
             fp_str = b''
             for (header, value) in headers:
                 fp_str += b'(' + hexlify(bytes(header,'utf-8')) +\
-                          hexlify(b': ') + hexlify(bytes(value,'utf-8')) + b')'
+                              hexlify(b': ') + hexlify(bytes(value,'utf-8')) + b')'
                 msg['headers'].append({header: value})
             return fp_str.decode()
         except:
@@ -227,11 +227,10 @@ class HTTP2:
 
         msg['flags'] = OrderedDict({})
 
-        if frame_type == 'SETTINGS' or frame_type == 'PING':
-            if data & 1:
+        if data & 1:
+            if frame_type in ['SETTINGS', 'PING']:
                 msg['flags']['Ack'] = True
-        else:
-            if data & 1:
+            else:
                 msg['flags']['End_Stream'] = True
 
         if data & 4:
@@ -242,10 +241,10 @@ class HTTP2:
             msg['flags']['Priority'] = True
 
     def check_magic(self, data):
-        offset = 0
-
-        # pre-defined string in the spec, seems to be a joke on PRISM
-        if hexlify(data).startswith(b'505249202a20485454502f322e300d0a0d0a534d0d0a0d0a'):
-            offset = 24
-
-        return offset
+        return (
+            24
+            if hexlify(data).startswith(
+                b'505249202a20485454502f322e300d0a0d0a534d0d0a0d0a'
+            )
+            else 0
+        )

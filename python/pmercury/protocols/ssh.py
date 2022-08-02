@@ -3,13 +3,14 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import socket
 
 # SSH helper classes
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 
 
@@ -37,12 +38,12 @@ class SSH(Protocol):
 
 
     def proto_identify(self, data, offset):
-        if (data[offset]   == 83 and
-            data[offset+1] == 83 and
-            data[offset+2] == 72 and
-            data[offset+3] == 45):
-            return True
-        return False
+        return (
+            data[offset] == 83
+            and data[offset + 1] == 83
+            and data[offset + 2] == 72
+            and data[offset + 3] == 45
+        )
 
 
     def fingerprint(self, data, ip_offset, tcp_offset, app_offset, ip_type, ip_length, data_len):
@@ -58,9 +59,7 @@ class SSH(Protocol):
         if flow_key not in self.session_data and self.proto_identify(data,0) == False:
             return protocol_type, fp_str_, None
         elif self.proto_identify(data,0):
-            self.session_data[flow_key] = {}
-            self.session_data[flow_key]['protocol'] = data
-            self.session_data[flow_key]['kex'] = b''
+            self.session_data[flow_key] = {'protocol': data, 'kex': b''}
             return protocol_type, fp_str_, None
 
         data = self.session_data[flow_key]['kex'] + data
@@ -69,7 +68,7 @@ class SSH(Protocol):
             return protocol_type, fp_str_, None
 
         # check SSH packet length to limit possibility of parsing junk and handle fragmentation
-        if int.from_bytes(data[0:4], byteorder='big') + 4 > len(data):
+        if int.from_bytes(data[:4], byteorder='big') + 4 > len(data):
             self.session_data[flow_key]['kex'] += data
             return protocol_type, fp_str_, None
 
@@ -92,7 +91,7 @@ class SSH(Protocol):
         fp_str_ += '(' + ssh_['protocol'][:-2].hex() + ')'
 
         data = ssh_['kex']
-        kex_length = int.from_bytes(data[0:4], byteorder='big')
+        kex_length = int.from_bytes(data[:4], byteorder='big')
 
         # skip over message headers and Cookie field
         offset = 22
@@ -100,9 +99,9 @@ class SSH(Protocol):
             return None
 
         # parse kex algorithms
-        for i in range(10):
+        for _ in range(10):
             fp_str_, offset = self.parse_kex_field(data, offset, fp_str_)
-            if offset == None:
+            if offset is None:
                 return None
 
         return fp_str_
@@ -110,18 +109,15 @@ class SSH(Protocol):
 
     def parse_kex_field(self, data, offset, fp_str_):
         len_ = int.from_bytes(data[offset:offset+4], byteorder='big')
-        fp_str_ += '(' + data[offset+4:offset+4+len_].hex() + ')'
+        fp_str_ += f'({data[offset+4:offset+4+len_].hex()})'
         offset += 4 + len_
-        if offset > len(data):
-            return None, None
-        return fp_str_, offset
+        return (None, None) if offset > len(data) else (fp_str_, offset)
 
 
     def get_human_readable(self, fp_str_):
         fields = [bytes.fromhex(s_[1:]) for s_ in fp_str_.split(')')[:-1]]
 
-        fp_h = {}
-        fp_h['protocol']         = fields[0].decode().split(',')
+        fp_h = {'protocol': fields[0].decode().split(',')}
         fp_h['kex_algos']        = fields[1].decode().split(',')
         fp_h['s_host_key_algos'] = fields[2].decode().split(',')
         fp_h['c_enc_algos']      = fields[3].decode().split(',')

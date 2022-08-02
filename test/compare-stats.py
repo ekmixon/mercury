@@ -7,9 +7,7 @@ from collections import defaultdict
 def update_stats_db(stats, src_ip, str_repr, dst_info, count):
     # set up stats entries
     if src_ip not in stats:
-        stats[src_ip] = {}
-        stats[src_ip]['count'] = 0
-        stats[src_ip]['fingerprints'] = {}
+        stats[src_ip] = {'count': 0, 'fingerprints': {}}
     if str_repr not in stats[src_ip]['fingerprints']:
         stats[src_ip]['fingerprints'][str_repr] = defaultdict(int)
 
@@ -112,10 +110,7 @@ def compare_stats_dbs(merc_db, merc_stats):
             print(f'\t{src_ip}')
         unmatched = True
 
-    if unmatched:
-        return False
-
-    return True
+    return not unmatched
 
 
 def main():
@@ -126,10 +121,10 @@ def main():
                       help='mercury statistics file',default=None)
 
     args = parser.parse_args()
-    if args.merc_out == None:
+    if args.merc_out is None:
         print('error: specify mercury output file')
         sys.exit(1)
-    if args.merc_stats == None:
+    if args.merc_stats is None:
         print('error: specify mercury statistics file')
         sys.exit(1)
 

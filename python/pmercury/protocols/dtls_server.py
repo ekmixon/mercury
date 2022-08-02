@@ -3,12 +3,13 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import functools
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.tls_utils import *
 from pmercury.utils.tls_constants import *
 from pmercury.protocols.protocol import Protocol
@@ -29,14 +30,14 @@ class DTLS_Server(Protocol):
     def proto_identify(data, offset, data_len):
         if data_len-offset < 27:
             return False
-        if (data[offset]    ==  22 and
-            data[offset+1]  == 254 and
-            data[offset+2]  >= 253 and
-            data[offset+13] ==   2 and
-            data[offset+25] == 254 and
-            data[offset+26] >= 253):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 254
+            and data[offset + 2] >= 253
+            and data[offset + 13] == 2
+            and data[offset + 25] == 254
+            and data[offset + 26] >= 253
+        )
 
 
     @staticmethod
@@ -59,28 +60,28 @@ class DTLS_Server(Protocol):
         fp_ += f'({data[offset]:02x}{data[offset+1]:02x})'
         offset += 2
         if offset >= data_len:
-            return fp_+'()', None
+            return f'{fp_}()', None
 
         # parse/skip compression method
         compression_methods_length = data[offset]
         offset += 1 + compression_methods_length
         if offset >= data_len:
-            return fp_+'()', None
+            return f'{fp_}()', None
 
         # parse/skip extensions length
         ext_total_len = int.from_bytes(data[offset:offset+2], byteorder='big')
         offset += 2
         if offset >= data_len:
-            return fp_+'()', None
+            return f'{fp_}()', None
 
         # parse/extract/skip extension type/length/values
         fp_ += '('
         while ext_total_len > 0:
             if offset >= data_len:
-                return fp_+')', None
+                return f'{fp_})', None
 
             tmp_fp_ext, offset, ext_len = parse_extension(data, offset)
-            fp_ += '(%s)' % tmp_fp_ext
+            fp_ += f'({tmp_fp_ext})'
 
             ext_total_len -= 4 + ext_len
         fp_ += ')'

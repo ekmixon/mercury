@@ -3,12 +3,13 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import ast
 import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 
 
@@ -21,12 +22,30 @@ class HTTP(Protocol):
         # configuration
         HTTP.all_headers = False
         HTTP.all_headers_and_data = False
-        if config == None or 'http' not in config:
-            HTTP.static_names = set([b'accept-charset',b'accept-language',b'authorization',b'cache-control',b'host',
-                                     b'if-modified-since',b'keep-alive',b'user-agent',b'x-flash-version',
-                                     b'x-p2p-peerdist'])
-            HTTP.static_names_and_values = set([b'upgrade-insecure-requests',b'dnt',b'connection',
-                                                b'x-requested-with',b'accept-encoding',b'accept',b'dpr'])
+        if config is None or 'http' not in config:
+            HTTP.static_names = {
+                b'accept-charset',
+                b'accept-language',
+                b'authorization',
+                b'cache-control',
+                b'host',
+                b'if-modified-since',
+                b'keep-alive',
+                b'user-agent',
+                b'x-flash-version',
+                b'x-p2p-peerdist',
+            }
+
+            HTTP.static_names_and_values = {
+                b'upgrade-insecure-requests',
+                b'dnt',
+                b'connection',
+                b'x-requested-with',
+                b'accept-encoding',
+                b'accept',
+                b'dpr',
+            }
+
             HTTP.headers_data = [0,2]
             HTTP.contextual_data = {b'user-agent':'user_agent',b'host':'host',b'x-forwarded-for':'x_forwarded_for',b'uri':'uri'}
         else:
@@ -60,12 +79,12 @@ class HTTP(Protocol):
     def proto_identify(data, offset, data_len):
         if data_len-offset < 16:
             return False
-        if (data[offset]   == 71 and
-            data[offset+1] == 69 and
-            data[offset+2] == 84 and
-            data[offset+3] == 32):
-            return True
-        return False
+        return (
+            data[offset] == 71
+            and data[offset + 1] == 69
+            and data[offset + 2] == 84
+            and data[offset + 3] == 32
+        )
 
 
     @staticmethod
@@ -75,10 +94,7 @@ class HTTP(Protocol):
         if len(request) < 3:
             return None, None
 
-        c = []
-        for rh in HTTP.headers_data:
-            c.append('(%s)' % request[rh].hex())
-
+        c = [f'({request[rh].hex()})' for rh in HTTP.headers_data]
         if len(t_) == 1:
             return ''.join(c), None
 
@@ -101,17 +117,12 @@ class HTTP(Protocol):
             t0_lower = t0_.lower()
 
             h_c = ''
-            if http_ahd:
+            if http_ahd or t0_lower in http_snv:
                 h_c = h_.hex()
-            elif t0_lower in http_snv:
-                h_c = h_.hex()
-            elif t0_lower in http_sn:
+            elif t0_lower in http_sn or http_ah:
                 h_c = t0_.hex()
-            elif http_ah:
-                h_c = t0_.hex()
-
             if h_c != '':
-                c.append('(%s)' % h_c)
+                c.append(f'({h_c})')
             if t0_lower in http_ctx:
                 if b'\x3a\x20' in h_:
                     try:
@@ -131,10 +142,7 @@ class HTTP(Protocol):
         if len(request) < 3:
             return None, None
 
-        c = []
-        for rh in HTTP.headers_data:
-            c.append('(%s)' % request[rh].hex())
-
+        c = [f'({request[rh].hex()})' for rh in HTTP.headers_data]
         if len(t_) == 1:
             return ''.join(c), None
 
@@ -151,16 +159,12 @@ class HTTP(Protocol):
             t0_lower = t0_.lower()
 
 
-            if http_ah:
-                h_c = h_.hex()
-            elif t0_lower in http_cish:
-                h_c = h_.hex()
-            elif t0_ in http_cssh:
+            if http_ah or t0_lower in http_cish or t0_ in http_cssh:
                 h_c = h_.hex()
             else:
                 h_c = t0_.hex()
 
-            c.append('(%s)' % h_c)
+            c.append(f'({h_c})')
             if t0_lower in http_ctx:
                 if b'\x3a\x20' in h_:
                     try:
@@ -189,15 +193,10 @@ class HTTP(Protocol):
             t0_lower = t0_.lower()
 
             h_c = ''
-            if http_ahd:
+            if http_ahd or t0_lower in http_snv:
                 h_c = b_str.hex()
-            elif t0_lower in http_snv:
-                h_c = b_str.hex()
-            elif t0_lower in http_sn:
+            elif t0_lower in http_sn or http_ah:
                 h_c = t0_.hex()
-            elif http_ah:
-                h_c = t0_.hex()
-
             if h_c != '':
                 c.append(f'({h_c})')
 

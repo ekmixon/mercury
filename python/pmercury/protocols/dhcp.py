@@ -3,13 +3,14 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import functools
 from socket import AF_INET, AF_INET6, inet_ntop
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 
 MAX_CACHED_RESULTS = 2**24
@@ -20,7 +21,7 @@ class DHCP(Protocol):
         # populate fingerprint databases
         self.fp_db = None
 
-        DHCP.static_data = set([0x35, 0x37])
+        DHCP.static_data = {0x35, 0x37}
         DHCP.contextual_data = {0x03: ('router',lambda x: inet_ntop(AF_INET, x)),
                                 0x06: ('domain_name_server',lambda x: inet_ntop(AF_INET, x)),
                                 0x0c: ('hostname',lambda x: x.decode()),
@@ -32,13 +33,13 @@ class DHCP(Protocol):
     def proto_identify(data, offset, data_len):
         if data_len < 230:
             return False
-        if (data[offset]     != 0x01 or
-            data[offset+236] != 0x63 or
-            data[offset+237] != 0x82 or
-            data[offset+238] != 0x53 or
-            data[offset+239] != 0x63):
-            return False
-        return True
+        return (
+            data[offset] == 0x01
+            and data[offset + 236] == 0x63
+            and data[offset + 237] == 0x82
+            and data[offset + 238] == 0x53
+            and data[offset + 239] == 0x63
+        )
 
 
     @staticmethod
@@ -46,12 +47,18 @@ class DHCP(Protocol):
         hardware_address_length = data[offset + 2]
 
         cmac = data[offset+28:offset+28+hardware_address_length].hex()
-        context = [{'name': 'client_mac_address', 'data': '%s' % ':'.join(a+b for a,b in zip(cmac[::2], cmac[1::2]))}]
+        context = [
+            {
+                'name': 'client_mac_address',
+                'data': f"{':'.join((a+b for a,b in zip(cmac[::2], cmac[1::2])))}",
+            }
+        ]
+
         offset += 240
         fp_ = '('
         while offset < data_len:
             kind = data[offset]
-            if kind == 0xff or kind == 0x00: # End / Padding
+            if kind in [0xFF, 0x00]: # End / Padding
                 fp_ += '(%02x)' % kind
                 break
 
@@ -67,7 +74,7 @@ class DHCP(Protocol):
                 offset += length+2
                 continue
 
-            fp_ += '(%s)' % data[offset:offset+2+length].hex()
+            fp_ += f'({data[offset:offset+2+length].hex()})'
             offset += length+2
         fp_ += ')'
 

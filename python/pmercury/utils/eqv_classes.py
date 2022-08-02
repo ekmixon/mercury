@@ -9,14 +9,14 @@ from collections import OrderedDict, defaultdict
 
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.pmercury_utils import *
 
 
 tlds = set([])
+public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
 if os.name == 'nt':
     import gzip
-    public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
     for line in gzip.open(public_suffix_file_raw, 'r'):
         line = line.strip()
         if line.startswith(b'//') or line == b'':
@@ -25,9 +25,8 @@ if os.name == 'nt':
             line = line[2:]
         tlds.add(line.decode())
 else:
-    public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
     cmd = 'gzcat' if sys.platform == 'darwin' else 'zcat'
-    for line in os.popen(cmd + ' %s' % (public_suffix_file_raw)):
+    for line in os.popen(cmd + f' {public_suffix_file_raw}'):
         line = line.strip()
         if line.startswith('//') or line == '':
             continue
@@ -44,7 +43,7 @@ class EquivalenceClasses:
         self.classes = defaultdict(list)
 #        self.dst_keys = ['classes_hostname_domains','classes_hostname_tlds']
 #        self.dst_keys = ['classes_hostname_domains']
-        self.dst_features = set(['dst_ip','dst_port','server_name'])
+        self.dst_features = {'dst_ip', 'dst_port', 'server_name'}
         self.dict_data = {}
         self.radix_tries = {}
         self.load_files(resource_dir)
@@ -85,9 +84,11 @@ class EquivalenceClasses:
 
 
     def get_dst_info(self, dst_ip, dst_port, server_name):
-        features = []
         domain_, tld_ = self.clean_hostname(server_name)
-        features.extend([('classes_hostname_domains',domain_),('classes_hostname_tlds',tld_)])
+        features = [
+            ('classes_hostname_domains', domain_),
+            ('classes_hostname_tlds', tld_),
+        ]
 #        features.extend([('classes_hostname_domains',domain_)])
 
         for feature in self.dst_features:
@@ -100,24 +101,24 @@ class EquivalenceClasses:
             else:
                 continue
 
-            for x_ in self.classes[feature]:
-                features.append((x_['name'], x_['mapper'](str(cur_f), x_['name'])))
+            features.extend(
+                (x_['name'], x_['mapper'](str(cur_f), x_['name']))
+                for x_ in self.classes[feature]
+            )
 
         return features
 
 
     def prepare_radix(self, t_):
         rtrie = pyasn.pyasn_radix.Radix()
-        e_str = []
-        for k,v in t_['data'].items():
-            e_str.append('%s\t%s\n' % (k, v))
+        e_str = ['%s\t%s\n' % (k, v) for k, v in t_['data'].items()]
         rtrie.load_ipasndb("", ''.join(e_str))
 
         self.radix_tries[t_['name']] = rtrie
 
 
     def clean_hostname(self, hostname):
-        if hostname == None or hostname == 'None':
+        if hostname is None or hostname == 'None':
             return 'None', 'None'
         tokens_ = hostname.split('.')
         tld_ = tokens_[-1]
@@ -125,14 +126,14 @@ class EquivalenceClasses:
         domain_ = tokens_[-1]
         tmp_domain_ = tokens_[-1]
         if len(tokens_) > 1:
-            domain_ = tokens_[-2] + '.' + domain_
-            tmp_domain_ = tokens_[-2] + '.' + tmp_domain_
+            domain_ = f'{tokens_[-2]}.{domain_}'
+            tmp_domain_ = f'{tokens_[-2]}.{tmp_domain_}'
         for i in range(2,7):
             if len(tokens_) < i:
                 return domain_, tld_
             if len(tokens_) > i:
-                tmp_domain_ = tokens_[(i+1)*-1] + '.' + tmp_domain_
-            tmp_tld_ = tokens_[i*-1] + '.' + tmp_tld_
+                tmp_domain_ = f'{tokens_[(i+1)*-1]}.{tmp_domain_}'
+            tmp_tld_ = f'{tokens_[i*-1]}.{tmp_tld_}'
             if tmp_tld_ in tlds:
                 domain_ = tmp_domain_
                 tld_ = tmp_tld_

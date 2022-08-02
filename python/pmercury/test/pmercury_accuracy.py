@@ -11,7 +11,7 @@ import importlib
 from importlib import machinery
 from multiprocessing import Pool
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../../')
 
 from fp_constants import *
 
@@ -103,9 +103,9 @@ class Validation:
     def analyze_results(self, results):
         r_tmp_ = self.mt_pool.map(process_result, [(sl, self.categories) for sl in results])
         r_tmp_ = [x for sl in r_tmp_ for x in sl]
-        r_ = [sum([row[i] for row in r_tmp_]) for i in range(0,len(r_tmp_[0][:-1]))]
+        r_ = [sum(row[i] for row in r_tmp_) for i in range(len(r_tmp_[0][:-1]))]
 
-        print('FILE: %s' % self.input_file)
+        print(f'FILE: {self.input_file}')
         print('\tTotal:\t\t\t\t    % 8i' % r_[0])
         print('\t                              :\t      top-1    top-2    top-3    top-4    top-5')
         print('\tProcess Name Category Accuracy:\t    %0.6f %0.6f %0.6f %0.6f %0.6f' % (r_[2]/r_[0], (r_[2]+r_[5])/r_[0], (r_[2]+r_[5]+r_[7])/r_[0], (r_[2]+r_[5]+r_[7]+r_[9])/r_[0], (r_[2]+r_[5]+r_[7]+r_[9]+r_[11])/r_[0]))
@@ -117,7 +117,7 @@ class Validation:
         for c in self.categories:
             if c == '':
                 continue
-            r_ = [sum([row[idx][i] for row in r_c]) for i in range(0,len(r_c[0][0]))]
+            r_ = [sum(row[idx][i] for row in r_c) for i in range(len(r_c[0][0]))]
             print('\n\t%s Accuracy:\t\t    %0.6f' % (c, (r_[1]/r_[0])))
             print('\t%s Confusion Matrix:' % c)
             print('\t\t\t   Positive       Negative')
@@ -142,7 +142,7 @@ class Validation:
         cur_line  = 0
 
         start = time.time()
-        for line in os.popen('zcat %s' % (f)):
+        for line in os.popen(f'zcat {f}'):
             cur_line += 1
             if cur_line > max_lines:
                 break
@@ -156,7 +156,7 @@ class Validation:
             fp_str      = t_[6].replace('()','')
             dst_x       = t_[7].split(')')
             os_         = clean_os_str(t_[8])
-            if os_ == None:
+            if os_ is None:
                 continue
 
             dst_ip      = dst_x[0][1:]
@@ -186,11 +186,10 @@ class Validation:
             domain = server_name
             sni_split = server_name.split('.')
             if len(sni_split) > 1:
-                domain = sni_split[-2] + '.' + sni_split[-1]
+                domain = f'{sni_split[-2]}.{sni_split[-1]}'
             if server_name in sni_whitelist or domain in domain_whitelist:
                 malware = False
-            app_cats = {}
-            app_cats['malware'] = malware
+            app_cats = {'malware': malware}
             for c in self.categories:
                 if c == 'malware':
                     app_cats[c] = malware
@@ -199,7 +198,7 @@ class Validation:
                     if c == app_cat:
                         app_cats[c] = True
 
-            if os_ == None:
+            if os_ is None:
                 continue
 
             if src not in data:
@@ -213,18 +212,12 @@ class Validation:
 
 
     def read_file_json(self, f):
-        data = {}
-
         start = time.time()
         key_ = 0
-        data[key_] = []
-        for line in os.popen('zcat %s' % (f)):
+        data = {key_: []}
+        for line in os.popen(f'zcat {f}'):
             fp_ = json.loads(line)
-            if 'str_repr' in fp_:
-                fp_str = fp_['str_repr']
-            else:
-                fp_str = fp_['md5']
-
+            fp_str = fp_['str_repr'] if 'str_repr' in fp_ else fp_['md5']
             if 'process_info' in fp_:
                 new_procs = []
                 fp_malware_ = is_fp_malware(fp_)
@@ -243,7 +236,7 @@ class Validation:
                     proc = p_['process']
                     sha256 = p_['sha256']
 
-                    if p_['process'] in uninformative_proc_names:
+                    if proc in uninformative_proc_names:
                         continue
 
 
@@ -262,8 +255,7 @@ class Validation:
                     if proc in self.app_cat_data:
                         app_cat = self.app_cat_data[proc]
                     malware = is_proc_malware(p_, False)
-                    app_cats = {}
-                    app_cats['malware'] = malware
+                    app_cats = {'malware': malware}
                     for c in self.categories:
                         if c == 'malware':
                             app_cats[c] = malware
@@ -290,25 +282,17 @@ class Validation:
 
 
     def read_file_dmz_json(self, f):
-        data = {}
-
         key_ = 0
-        data[key_] = []
+        data = {key_: []}
         start = time.time()
-        for line in os.popen('zcat %s' % (f)):
+        proc = 'dmz_process'
+        sha256 = 'dmz_process'
+        app_cats = {'malware': False}
+        for line in os.popen(f'zcat {f}'):
             fp_ = json.loads(line)
-            if 'str_repr' in fp_:
-                fp_str = fp_['str_repr']
-            else:
-                fp_str = fp_['md5']
+            fp_str = fp_['str_repr'] if 'str_repr' in fp_ else fp_['md5']
             if fp_str in schannel_fps:
                 fp_str = 'schannel'
-
-            proc = 'dmz_process'
-            sha256 = 'dmz_process'
-            app_cats = {}
-            app_cats['malware'] = False
-
 #            if fp_str not in data:
 #                data[fp_str] = []
 
@@ -339,6 +323,9 @@ class Validation:
 
 def get_results(data):
     results = []
+    protocol    = 6
+    ts          = 0.00
+
     for d_ in data:
         src_ip      = d_[0]
         src_port    = d_[1]
@@ -353,9 +340,6 @@ def get_results(data):
         os_         = d_[10]
         app_cats    = d_[11]
         target_proc = d_[12]
-        protocol    = 6
-        ts          = 0.00
-
 #        if '()(' in str_repr:
 #            continue
 
@@ -365,7 +349,7 @@ def get_results(data):
 
         # uncomment to get results without approximate matches
         fp_ = fingerprinter.get_database_entry(str_repr, type_)
-        if fp_ == None or 'approx_str' in fp_:
+        if fp_ is None or 'approx_str' in fp_:
             continue
 
         flow = fingerprinter.process_csv(type_, str_repr, src_ip, dst_ip, src_port, dst_port,
@@ -387,12 +371,18 @@ def get_results(data):
             if app_cats[k] == True:
                 app_cat = k
 
-        o_ = {}
-        o_['count'] = cnt
-        o_['fp_str'] = str_repr
-        o_['score'] = pi_['score']
+        o_ = {
+            'count': cnt,
+            'fp_str': str_repr,
+            'score': pi_['score'],
+            'ground_truth': {
+                'process': proc,
+                'sha256': sha256,
+                'server_name': server_name,
+                'dst_ip': dst_ip,
+            },
+        }
 
-        o_['ground_truth']   = {'process': proc, 'sha256': sha256, 'server_name': server_name, 'dst_ip': dst_ip}
         o_['ground_truth']['categories'] = {'malware': app_cats['malware'], app_cat: True}
         if target_proc != None:
             for test_proc in target_proc:
@@ -400,8 +390,13 @@ def get_results(data):
                 if proc in test_proc:
                     o_['ground_truth']['categories'][test_proc[0]] = True
 
-        o_['inferred_truth'] = {'process': pi_['process'].lower(), 'sha256': pi_['sha256'], 'probable_processes': r_['probable_processes']}
-        o_['inferred_truth']['categories'] = {}
+        o_['inferred_truth'] = {
+            'process': pi_['process'].lower(),
+            'sha256': pi_['sha256'],
+            'probable_processes': r_['probable_processes'],
+            'categories': {},
+        }
+
         if target_proc != None:
             for test_proc in target_proc:
                 o_['inferred_truth']['categories'][test_proc[0]] = False
@@ -421,6 +416,9 @@ def get_results(data):
 def get_results_blacklist(data):
     global fp_sni_blacklist
     results = []
+    protocol    = 6
+    ts          = 0.00
+
     for d_ in data:
         src_ip      = d_[0]
         src_port    = d_[1]
@@ -434,19 +432,21 @@ def get_results_blacklist(data):
         cnt         = d_[9]
         os_         = d_[10]
         app_cats    = d_[11]
-        protocol    = 6
-        ts          = 0.00
+        o_ = {
+            'count': cnt,
+            'fp_str': str_repr,
+            'score': 0.0,
+            'ground_truth': {
+                'process': proc,
+                'sha256': sha256,
+                'server_name': server_name,
+            },
+        }
 
-        o_ = {}
-        o_['count'] = cnt
-        o_['fp_str'] = str_repr
-        o_['score'] = 0.0
-        o_['ground_truth']   = {'process': proc, 'sha256': sha256, 'server_name': server_name}
         o_['ground_truth']['categories'] = {'malware': app_cats['malware']}
         o_['inferred_truth'] = {'process': 'n/a', 'sha256': 'n/a'}
-
 #        k = '%s,%s' % (str_repr, server_name)
-        k = '%s,%s' % (str_repr, dst_ip)
+        k = f'{str_repr},{dst_ip}'
 #        k = '%s' % (dst_ip)
         if k in fp_sni_blacklist:
             o_['inferred_truth']['categories'] = {'malware': True}
@@ -472,7 +472,7 @@ def get_results_top(data):
         target_proc = d_[12]
 
         fp_ = fingerprinter.get_database_entry(str_repr, type_)
-        if fp_ == None:
+        if fp_ is None:
             continue
         if 'process_info' not in fp_:
             continue
@@ -489,11 +489,18 @@ def get_results_top(data):
             if app_cats[k] == True:
                 app_cat = k
 
-        o_ = {}
-        o_['count'] = cnt
-        o_['fp_str'] = str_repr
-        o_['score'] = 0.0
-        o_['ground_truth']   = {'process': proc, 'sha256': sha256, 'server_name': server_name, 'dst_ip': dst_ip}
+        o_ = {
+            'count': cnt,
+            'fp_str': str_repr,
+            'score': 0.0,
+            'ground_truth': {
+                'process': proc,
+                'sha256': sha256,
+                'server_name': server_name,
+                'dst_ip': dst_ip,
+            },
+        }
+
         o_['ground_truth']['categories'] = {'malware': app_cats['malware'], app_cat: True}
         if target_proc != None:
             for test_proc in target_proc:
@@ -501,8 +508,12 @@ def get_results_top(data):
                 if proc in test_proc:
                     o_['ground_truth']['categories'][test_proc[0]] = True
 
-        o_['inferred_truth'] = {'process': pi_['process'].lower(), 'sha256': pi_['sha256s']}
-        o_['inferred_truth']['categories'] = {}
+        o_['inferred_truth'] = {
+            'process': pi_['process'].lower(),
+            'sha256': pi_['sha256s'],
+            'categories': {},
+        }
+
         if target_proc != None:
             for test_proc in target_proc:
                 o_['inferred_truth']['categories'][test_proc[0]] = False
@@ -514,7 +525,7 @@ def get_results_top(data):
         else:
             o_['inferred_truth']['categories']['malware'] = False
         o_['inferred_truth']['probable_processes'] = []
-        for p_ in fp_['process_info'][0:5]:
+        for p_ in fp_['process_info'][:5]:
             o_['inferred_truth']['probable_processes'].append({'process': p_['process']})
 
         results.append(o_)
@@ -525,10 +536,6 @@ def get_results_top(data):
 verbose_out = open('verbose_out.txt','w')
 
 def clean_proc(p):
-    return p
-    p = p.lower().replace('.exe','')
-    if p.endswith('d'):
-        return p[:-1]
     return p
 
 

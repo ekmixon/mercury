@@ -3,11 +3,12 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 
 
@@ -20,18 +21,59 @@ class HTTP_Server(Protocol):
         # configuration
         HTTP_Server.all_headers = False
         HTTP_Server.all_headers_and_data = False
-        if config == None or 'http_server' not in config:
-            HTTP_Server.static_names = set([b'appex-activity-id',b'cdnuuid',b'cf-ray',b'content-range',b'content-type',
-                                            b'date',b'etag',b'expires',b'flow_context',b'ms-cv',b'msregion',b'ms-requestid',
-                                            b'request-id',b'vary',b'x-amz-cf-pop',b'x-amz-request-id',b'x-azure-ref-originshield',
-                                            b'x-cache',b'x-cache-hits',b'x-ccc',b'x-diagnostic-s',b'x-feserver',b'x-hw',
-                                            b'x-msedge-ref',b'x-ocsp-responder-id',b'x-requestid',b'x-served-by',b'x-timer',
-                                            b'x-trace-context'])
-            HTTP_Server.static_names_and_values = set([b'access-control-allow-credentials',b'access-control-allow-headers',
-                                                       b'access-control-allow-methods',b'access-control-expose-headers',
-                                                       b'cache-control',b'connection',b'content-language',b'content-transfer-encoding',
-                                                       b'p3p',b'pragma',b'server',b'strict-transport-security',b'x-aspnetmvc-version',
-                                                       b'x-aspnet-version',b'x-cid',b'x-ms-version',b'x-xss-protection'])
+        if config is None or 'http_server' not in config:
+            HTTP_Server.static_names = {
+                b'appex-activity-id',
+                b'cdnuuid',
+                b'cf-ray',
+                b'content-range',
+                b'content-type',
+                b'date',
+                b'etag',
+                b'expires',
+                b'flow_context',
+                b'ms-cv',
+                b'msregion',
+                b'ms-requestid',
+                b'request-id',
+                b'vary',
+                b'x-amz-cf-pop',
+                b'x-amz-request-id',
+                b'x-azure-ref-originshield',
+                b'x-cache',
+                b'x-cache-hits',
+                b'x-ccc',
+                b'x-diagnostic-s',
+                b'x-feserver',
+                b'x-hw',
+                b'x-msedge-ref',
+                b'x-ocsp-responder-id',
+                b'x-requestid',
+                b'x-served-by',
+                b'x-timer',
+                b'x-trace-context',
+            }
+
+            HTTP_Server.static_names_and_values = {
+                b'access-control-allow-credentials',
+                b'access-control-allow-headers',
+                b'access-control-allow-methods',
+                b'access-control-expose-headers',
+                b'cache-control',
+                b'connection',
+                b'content-language',
+                b'content-transfer-encoding',
+                b'p3p',
+                b'pragma',
+                b'server',
+                b'strict-transport-security',
+                b'x-aspnetmvc-version',
+                b'x-aspnet-version',
+                b'x-cid',
+                b'x-ms-version',
+                b'x-xss-protection',
+            }
+
             HTTP_Server.headers_data = [0,1,2]
             HTTP_Server.contextual_data = {b'via':'via'}
         else:
@@ -65,14 +107,14 @@ class HTTP_Server(Protocol):
     def proto_identify(data, offset, data_len):
         if data_len-offset < 16:
             return False
-        if (data[offset]   == 72 and
-            data[offset+1] == 84 and
-            data[offset+2] == 84 and
-            data[offset+3] == 80 and
-            data[offset+4] == 47 and
-            data[offset+5] == 49):
-            return True
-        return False
+        return (
+            data[offset] == 72
+            and data[offset + 1] == 84
+            and data[offset + 2] == 84
+            and data[offset + 3] == 80
+            and data[offset + 4] == 47
+            and data[offset + 5] == 49
+        )
 
 
     @staticmethod
@@ -85,7 +127,7 @@ class HTTP_Server(Protocol):
         c = []
         for rh in HTTP_Server.headers_data:
             try:
-                c.append('(%s)' % response[rh].hex())
+                c.append(f'({response[rh].hex()})')
             except IndexError:
                 c.append('()')
 
@@ -108,17 +150,12 @@ class HTTP_Server(Protocol):
             t0_lower = t0_.lower()
 
             h_c = ''
-            if http_ahd:
+            if http_ahd or t0_lower in http_snv:
                 h_c = h_.hex()
-            elif t0_lower in http_snv:
-                h_c = h_.hex()
-            elif t0_lower in http_sn:
+            elif t0_lower in http_sn or http_ah:
                 h_c = t0_.hex()
-            elif http_ah:
-                h_c = t0_.hex()
-
             if h_c != '':
-                c.append('(%s)' % h_c)
+                c.append(f'({h_c})')
             if t0_lower in http_ctx:
                 if b'\x3a\x20' in h_:
                     try:

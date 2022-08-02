@@ -3,13 +3,14 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import base64
 
 # TLS helper classes
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.protocols.protocol import Protocol
 from pmercury.utils.tls_utils import *
 from pmercury.utils.tls_constants import *
@@ -23,34 +24,34 @@ class TLS_Certificate(Protocol):
 
     @staticmethod
     def proto_identify(data, offset):
-        if (data[offset]   == 22 and
-            data[offset+1] ==  3 and
-            data[offset+2] <=  3 and
-            data[offset+5] == 11):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 11
+        )
 
 
     @staticmethod
     def proto_identify_hs(data, offset):
-        if (data[offset]   == 11 and
-            data[offset+1] ==  0 and
-            data[offset+4] ==  0 and
-            data[offset+7] ==  0):
-            return True
-        return False
+        return (
+            data[offset] == 11
+            and data[offset + 1] == 0
+            and data[offset + 4] == 0
+            and data[offset + 7] == 0
+        )
 
 
     @staticmethod
     def proto_identify_sh(data, offset):
-        if (data[offset]    == 22 and
-            data[offset+1]  ==  3 and
-            data[offset+2]  <=  3 and
-            data[offset+5]  ==  2 and
-            data[offset+9]  ==  3 and
-            data[offset+10] <=  3):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 2
+            and data[offset + 9] == 3
+            and data[offset + 10] <= 3
+        )
 
 
     @staticmethod
@@ -74,12 +75,12 @@ class TLS_Certificate(Protocol):
             data[offset+5] == 11 and
             data[offset+6] ==  0):
             offset += 5
-        elif (data[offset]   == 11 and
-              data[offset+1] ==  0 and
-              data[offset+4] ==  0 and
-              data[offset+7] ==  0):
-            pass
-        else:
+        elif (
+            data[offset] != 11
+            or data[offset + 1] != 0
+            or data[offset + 4] != 0
+            or data[offset + 7] != 0
+        ):
             return None, None
 
         certificates_length = int(data[offset+4:offset+7].hex(),16)
@@ -94,7 +95,7 @@ class TLS_Certificate(Protocol):
             if offset >= data_len:
                 return certs, None
 
-            if certs == None:
+            if certs is None:
                 certs = []
 
             certs.append(base64.b64encode(data[offset:offset+cert_len]).decode())
@@ -118,8 +119,6 @@ class TLS_Certificate(Protocol):
 
 
     def cert_parser(self, cert):
-        out_ = {}
-
         # parse to cert data
         _, _, cert, _ = self.parse_tlv(cert, 0)
         _, _, cert, _ = self.parse_tlv(cert, 0)
@@ -128,58 +127,53 @@ class TLS_Certificate(Protocol):
 
         # parse version
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if value != None:
-            if value.hex() in cert_versions:
-                value = cert_versions[value.hex()]
-            else:
-                offset = 0
-                value = cert_versions['02']
+        if value != None and value.hex() in cert_versions:
+            value = cert_versions[value.hex()]
         else:
             offset = 0
             value = cert_versions['02']
-        out_['version'] = value
-
+        out_ = {'version': value}
         # parse serial number
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['serial_number'] = value.hex()
 
         # parse signature
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['algorithm_identifier'] = self.parse_signature_algorithm(value)
 
         # parse issuer
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['issuer'] = self.parse_rdn_sequence(value)
 
         # parse validity
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['validity'] = self.parse_validity(value)
 
         # parse subject
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['subject'] = self.parse_rdn_sequence(value)
 
         # skip subject_public_key_info
         _, _, value, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
 
         # parse extensions
         _, _, cert_ext_outer, offset = self.parse_tlv(cert, offset)
-        if offset == None:
+        if offset is None:
             return out_
         _, _, cert_ext, _ = self.parse_tlv(cert_ext_outer, 0)
-        if cert_ext == None:
+        if cert_ext is None:
             return out_
 
 
@@ -187,7 +181,7 @@ class TLS_Certificate(Protocol):
         cert_exts = []
         ext_offset = 0
         _, _, ext_value, ext_offset = self.parse_tlv(cert_ext, ext_offset)
-        if ext_offset == None:
+        if ext_offset is None:
             return out_
         while ext_offset != None:
             ext_ = self.parse_ext(ext_value)
@@ -201,17 +195,15 @@ class TLS_Certificate(Protocol):
 
     def parse_signature_algorithm(self, val_):
         _, _, alg_, offset = self.parse_tlv(val_, 0)
-        if offset == None:
+        if offset is None:
             return val_
         alg_ = alg_.hex()
         if alg_ in oid_mapping:
             alg_ = oid_mapping[alg_]
 
-        out_ = {}
-        out_['algorithm'] = alg_
-
+        out_ = {'algorithm': alg_}
         _, _, params_, offset = self.parse_tlv(val_, offset)
-        if offset == None:
+        if offset is None:
             return out_
         out_['parameters'] = params_.hex()
 
@@ -220,7 +212,7 @@ class TLS_Certificate(Protocol):
 
     def parse_subject_alt_name(self, val_):
         _, _, sans_, offset = self.parse_tlv(val_, 0)
-        if offset == None:
+        if offset is None:
             return ''
 
         san_arr = []
@@ -241,7 +233,7 @@ class TLS_Certificate(Protocol):
 
     def parse_key_usage(self, val_):
         _, _, val_, offset = self.parse_tlv(val_, 0)
-        if offset == None or len(val_) < 2:
+        if offset is None or len(val_) < 2:
             return ''
 
         padding = val_[0]
@@ -270,10 +262,10 @@ class TLS_Certificate(Protocol):
     def parse_ext(self, data):
         offset = 0
         _, _, id_, offset = self.parse_tlv(data, offset)
-        if offset == None:
+        if offset is None:
             return None
         _, _, val_, offset = self.parse_tlv(data, offset)
-        if offset == None:
+        if offset is None:
             return None
 
         critical = False
@@ -305,7 +297,7 @@ class TLS_Certificate(Protocol):
     def parse_validity(self, data):
         offset = 0
         _, _, not_before, offset = self.parse_tlv(data, offset)
-        if offset == None:
+        if offset is None:
             return None
 
         try:
@@ -314,7 +306,7 @@ class TLS_Certificate(Protocol):
             out_ = {'not_before': not_before.hex()}
 
         _, _, not_after, offset = self.parse_tlv(data, offset)
-        if offset == None:
+        if offset is None:
             return out_
 
         try:
@@ -327,26 +319,22 @@ class TLS_Certificate(Protocol):
 
     def parse_rdn_sequence_item(self, data):
         _, _, value, _ = self.parse_tlv(data, 0)
-        if value == None:
+        if value is None:
             return None
 
         offset = 0
         _, _, id_, offset = self.parse_tlv(value, offset)
-        if offset == None:
+        if offset is None:
             return None
         tag_, _, val_, offset = self.parse_tlv(value, offset)
-        if offset == None:
+        if offset is None:
             return None
 
         id_ = id_.hex()
         if id_.startswith('5504') and len(id_) == 6 and id_[4:6] in cert_attribute_types:
             id_ = cert_attribute_types[id_[4:6]]
 
-        if tag_ == 19 or tag_ == 12: # printable string
-            val_ = val_.decode()
-        else:
-            val_ = val_.hex()
-
+        val_ = val_.decode() if tag_ in [19, 12] else val_.hex()
         return {id_: val_}
 
 

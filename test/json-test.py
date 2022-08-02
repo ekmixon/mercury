@@ -136,7 +136,7 @@ def test_mercury_json_line(line):
 
 def main():
     if len(sys.argv) != 2 or sys.argv[1] == '--help':
-        print('usage: %s <jsonfilename>' % sys.argv[0])
+        print(f'usage: {sys.argv[0]} <jsonfilename>')
         return -1
     inputfilename = sys.argv[1]
 

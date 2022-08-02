@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import socket
@@ -16,7 +17,7 @@ from pmercury.protocols.http2 import HTTP2
 
 # TLS helper classes
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.tls_utils import *
 from pmercury.utils.tls_constants import *
 from pmercury.utils.tls_crypto import TLS_CRYPTO
@@ -56,7 +57,7 @@ class TLS_Decrypt:
             return
         elif len(tokens[1]) != 64:
             return
-        elif len(tokens[2]) != 96 and len(tokens[2]) != 64:
+        elif len(tokens[2]) not in [96, 64]:
             return
 
         if tokens[1] not in self.secrets:
@@ -77,14 +78,14 @@ class TLS_Decrypt:
 
 
     def proto_identify_ch(self, data, offset):
-        if (data[offset]    == 22 and
-            data[offset+1]  ==  3 and
-            data[offset+2]  <=  3 and
-            data[offset+5]  ==  1 and
-            data[offset+9]  ==  3 and
-            data[offset+10] <=  3):
-            return True
-        return False
+        return (
+            data[offset] == 22
+            and data[offset + 1] == 3
+            and data[offset + 2] <= 3
+            and data[offset + 5] == 1
+            and data[offset + 9] == 3
+            and data[offset + 10] <= 3
+        )
 
 
     def client_hello(self, data, flow_key):
@@ -92,7 +93,10 @@ class TLS_Decrypt:
         if str(hexlify(data[4:6]),'utf-8') in TLS_VERSION:
             self.session_metadata[flow_key]['version'] = TLS_VERSION[str(hexlify(data[4:6]),'utf-8')]
         else:
-            self.session_metadata[flow_key]['version'] = 'unknown (%s)' % (str(hexlify(data[4:6]),'utf-8'))
+            self.session_metadata[flow_key][
+                'version'
+            ] = f"unknown ({str(hexlify(data[4:6]), 'utf-8')})"
+
 
         # Parse ClientHello client_random
         self.session_metadata[flow_key]['client_random'] = str(hexlify(data[6:38]),'utf-8')
@@ -103,7 +107,7 @@ class TLS_Decrypt:
         # Parse ServerHello server_random
         self.session_metadata[flow_key]['server_random'] = str(hexlify(data[6:38]),'utf-8')
         offset = 38
-        
+
         # Parse ServerHello session_id ...
         #   if this is not TLS 1.3
         session_id_length = data[offset]
@@ -155,19 +159,23 @@ class TLS_Decrypt:
         tmp_data, pad_length, auth_length = self.tls_crypto.decrypt(data[5:5+record_length], flow_key,
                                                                     self.cur_mode, self.session_metadata[flow_key],
                                                                     self.tls_sequence, self.secrets, self.tls13_handshake)
-        if tmp_data == None or len(tmp_data) < 2:
+        if tmp_data is None or len(tmp_data) < 2:
             return
 
         # check if the message is an encrypted alert message
-        if len(tmp_data) >= 2 and len(tmp_data) < 4:
-            if tmp_data[0] in TLS_ALERT_LEVELS and tmp_data[1] in TLS_ALERT_DESCRIPTIONS:
-                return
+        if (
+            len(tmp_data) < 4
+            and tmp_data[0] in TLS_ALERT_LEVELS
+            and tmp_data[1] in TLS_ALERT_DESCRIPTIONS
+        ):
+            return
 
         # check if the message is an encrypted handshake message
-        if tmp_data[0] in TLS_HANDSHAKE_MESSAGE_TYPES:
-            if int(hexlify(tmp_data[1:4]),16) <= len(tmp_data):
-                self.parse_encrypted_content_message(tmp_data, flow_key)
-                return
+        if tmp_data[0] in TLS_HANDSHAKE_MESSAGE_TYPES and int(
+            hexlify(tmp_data[1:4]), 16
+        ) <= len(tmp_data):
+            self.parse_encrypted_content_message(tmp_data, flow_key)
+            return
 
 
         if 'application_layer_protocol' not in self.session_metadata[flow_key]:
@@ -176,12 +184,10 @@ class TLS_Decrypt:
             if self.session_metadata[flow_key]['application_layer_protocol'].startswith('http/1'):
                 if self.cur_mode == 'client':
                     http_fp,_ = self.http.fingerprint(tmp_data, 0, len(tmp_data))
-                    if http_fp != None:
-                        return http_fp
                 else:
                     http_fp,_ = self.http_server.fingerprint(tmp_data, 0, len(tmp_data))
-                    if http_fp != None:
-                        return http_fp
+                if http_fp != None:
+                    return http_fp
             elif self.session_metadata[flow_key]['application_layer_protocol'] == 'h2':
                 h2_fp = self.http2.fingerprint(tmp_data, flow_key, self.cur_mode)
                 if h2_fp != None:
@@ -194,8 +200,6 @@ class TLS_Decrypt:
             self.session_metadata[flow_key]['application_layer_protocol'] = 'http/1.1'
         elif b'HTTP/1' in data:
             self.session_metadata[flow_key]['application_layer_protocol'] = 'http/1.0'
-        elif b'HTTP/2.0' in data:
-            self.session_metadata[flow_key]['application_layer_protocol'] = 'h2'
         else:
             self.session_metadata[flow_key]['application_layer_protocol'] = 'h2'
 
@@ -256,12 +260,10 @@ class TLS_Decrypt:
 
         key_1 = hexlify(b''.join([src_addr,dst_addr,src_port,dst_port,pr])).decode()
         key_2 = hexlify(b''.join([dst_addr,src_addr,dst_port,src_port,pr])).decode()
-        if key_1 in self.session_metadata:
+        if key_1 in self.session_metadata or key_2 not in self.session_metadata:
             return key_1, 'client'
-        elif key_2 in self.session_metadata:
-            return key_2, 'server'
         else:
-            return key_1, 'client'
+            return key_2, 'server'
 
 
     def fingerprint(self, data, ip_offset, tcp_offset, app_offset, ip_type, ip_length, data_len):
@@ -281,15 +283,16 @@ class TLS_Decrypt:
 
         # check TLS version to limit possibility of parsing junk
         if str(hexlify(data[1:3]),'utf-8') not in TLS_VERSION or len(data) < 5:
-            # keep state to deal with larger packets
-            if flow_key+self.cur_mode in self.data_cache and self.data_cache[flow_key+self.cur_mode][2]:
-                data = self.data_cache[flow_key+self.cur_mode][0] + data
-                if len(data[5:]) < self.data_cache[flow_key+self.cur_mode][1]:
-                    self.data_cache[flow_key+self.cur_mode][0] = data
-                    return protocol_type, fp_str_, None
-            else:
+            if (
+                flow_key + self.cur_mode not in self.data_cache
+                or not self.data_cache[flow_key + self.cur_mode][2]
+            ):
                 return protocol_type, fp_str_, None
 
+            data = self.data_cache[flow_key+self.cur_mode][0] + data
+            if len(data[5:]) < self.data_cache[flow_key+self.cur_mode][1]:
+                self.data_cache[flow_key+self.cur_mode][0] = data
+                return protocol_type, fp_str_, None
         seen_client_hello = False
         offset = 0
         while offset < len(data):
@@ -301,16 +304,14 @@ class TLS_Decrypt:
                 # keep state to hopefully recover, most likely due to packet fragmentation
                 if flow_key+self.cur_mode not in self.data_cache:
                     self.data_cache[flow_key+self.cur_mode] = [data[offset:],0,True]
-                    return protocol_type, fp_str_, None
-                else:
-                    return protocol_type, fp_str_, None
+                return protocol_type, fp_str_, None
             if len(data[offset:]) < 5:
                 if flow_key+self.cur_mode not in self.data_cache:
                     self.data_cache[flow_key+self.cur_mode] = [data[offset:],0,True]
                 else:
                     self.data_cache[flow_key+self.cur_mode][0] += data[offset:]
                 return protocol_type, fp_str_, None
-    
+
             record_length = int(hexlify(data[offset+3:offset+5]),16)
             if record_length > len(data[offset+5:]):
                 self.data_cache[flow_key+self.cur_mode] = [data[offset:],record_length,True]
@@ -327,11 +328,14 @@ class TLS_Decrypt:
 
             record_name = TLS_RECORD_TYPES[record_type]
             if record_name == 'change_cipher_spec':
-                self.session_metadata[flow_key][self.cur_mode + '_change_cipher_spec'] = 1
+                self.session_metadata[flow_key][f'{self.cur_mode}_change_cipher_spec'] = 1
             elif record_name == 'handshake':
                 # check for encrypted messages
-                if (flow_key in self.session_metadata and 
-                    self.cur_mode + '_change_cipher_spec' in self.session_metadata[flow_key]):
+                if (
+                    flow_key in self.session_metadata
+                    and f'{self.cur_mode}_change_cipher_spec'
+                    in self.session_metadata[flow_key]
+                ):
                     self.encrypted_handshake_message(data[offset:], flow_key)
                     offset += 5 + record_length
                     continue
@@ -362,20 +366,21 @@ class TLS_Decrypt:
                 if fp_str_ != None:
                     protocol_type += self.session_metadata[flow_key]['application_layer_protocol'].split('/')[0]
                     if mode == 'server':
-                        protocol_type += '_' + mode
+                        protocol_type += f'_{mode}'
 
             offset += 5 + record_length
 
 
-        if flow_key in self.session_metadata and 'seen_client_hello' in self.session_metadata[flow_key]:
-            return protocol_type, fp_str_, None
-        else:
+        if (
+            flow_key not in self.session_metadata
+            or 'seen_client_hello' not in self.session_metadata[flow_key]
+        ):
             self.data_cache.pop(flow_key+self.cur_mode,None)
             self.tls_sequence.pop(flow_key+self.cur_mode,None)
             self.tls13_handshake.pop(flow_key+self.cur_mode,None)
             self.session_metadata.pop(flow_key,None)
             self.session_metadata.pop(flow_key+self.cur_mode,None)
-            return protocol_type, fp_str_, None
+        return protocol_type, fp_str_, None
 
 
     def get_human_readable(self, fp_str_):

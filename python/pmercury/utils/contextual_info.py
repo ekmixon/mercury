@@ -3,6 +3,7 @@
  License at https://github.com/cisco/mercury/blob/master/LICENSE
 """
 
+
 import os
 import sys
 import pyasn
@@ -10,7 +11,7 @@ import pickle
 import functools
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-sys.path.append(os.path.dirname(os.path.abspath(__file__))+'/../')
+sys.path.append(f'{os.path.dirname(os.path.abspath(__file__))}/../')
 from pmercury.utils.pmercury_utils import *
 
 
@@ -20,9 +21,9 @@ MAX_CACHED_RESULTS = 2**24
 
 tlds = set([])
 
+public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
 if os.name == 'nt':
     import gzip
-    public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
     for line in gzip.open(public_suffix_file_raw, 'r'):
         line = line.strip()
         if line.startswith(b'//') or line == b'':
@@ -31,9 +32,8 @@ if os.name == 'nt':
             line = line[2:]
         tlds.add(line.decode())
 else:
-    public_suffix_file_raw = find_resource_path('resources/public_suffix_list.dat.gz')
     cmd = 'gzcat' if sys.platform == 'darwin' else 'zcat'
-    for line in os.popen(cmd + ' %s' % (public_suffix_file_raw)):
+    for line in os.popen(cmd + f' {public_suffix_file_raw}'):
         line = line.strip()
         if line.startswith('//') or line == '':
             continue
@@ -58,7 +58,7 @@ port_mapping = {
 
 @functools.lru_cache(maxsize=MAX_CACHED_RESULTS)
 def get_tld_info(hostname):
-    if hostname == None or hostname == 'None':
+    if hostname is None or hostname == 'None':
         return 'None', 'None'
     tokens_ = hostname.split('.')
     tld_ = tokens_[-1]
@@ -66,14 +66,14 @@ def get_tld_info(hostname):
     domain_ = tokens_[-1]
     tmp_domain_ = tokens_[-1]
     if len(tokens_) > 1:
-        domain_ = tokens_[-2] + '.' + domain_
-        tmp_domain_ = tokens_[-2] + '.' + tmp_domain_
+        domain_ = f'{tokens_[-2]}.{domain_}'
+        tmp_domain_ = f'{tokens_[-2]}.{tmp_domain_}'
     for i in range(2,7):
         if len(tokens_) < i:
             return domain_, tld_
         if len(tokens_) > i:
-            tmp_domain_ = tokens_[(i+1)*-1] + '.' + tmp_domain_
-        tmp_tld_ = tokens_[i*-1] + '.' + tmp_tld_
+            tmp_domain_ = f'{tokens_[(i+1)*-1]}.{tmp_domain_}'
+        tmp_tld_ = f'{tokens_[i*-1]}.{tmp_tld_}'
         if tmp_tld_ in tlds:
             domain_ = tmp_domain_
             tld_ = tmp_tld_
@@ -84,16 +84,9 @@ def get_tld_info(hostname):
 @functools.lru_cache(maxsize=MAX_CACHED_RESULTS)
 def get_asn_info(ip_addr):
     asn,_ = pyasn_contextual_data.lookup(ip_addr)
-    if asn != None:
-        return str(asn)
-
-    return 'unknown'
+    return str(asn) if asn != None else 'unknown'
 
 
 def get_port_application(port):
-    port_class = 'unknown'
-    if port in port_mapping:
-        port_class = port_mapping[port]
-
-    return port_class
+    return port_mapping[port] if port in port_mapping else 'unknown'
 
