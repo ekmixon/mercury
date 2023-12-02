@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.18.5
 RUN echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing/" >> /etc/apk/repositories && \
     apk update && \
     apk add --no-cache build-base git make gcc g++ linux-headers pkgconfig \
@@ -9,7 +9,7 @@ COPY . /src
 WORKDIR /src
 RUN ./configure && make V=s && make install-nonroot
 
-FROM alpine:latest
+FROM alpine:3.18.5
 WORKDIR /root/
 COPY --from=0 /usr/local /usr/local
 RUN apk update && \
